@@ -1,0 +1,6 @@
+server.js
+.workbuddy/
+deploy/
+node_modules/
+.DS_Store
+Thumbs.db
