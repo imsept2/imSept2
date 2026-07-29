@@ -20,6 +20,9 @@ const App = {
     if (window.navigator.standalone) {
       document.body.classList.add('pwa-standalone');
     }
+
+    // Auto-check version after a short delay
+    setTimeout(() => this.checkVersion(true), 2000);
   },
 
   bindEvents() {
@@ -73,6 +76,12 @@ const App = {
     const fab = document.getElementById('fab');
     if (fab) {
       fab.addEventListener('click', () => this.handleFab());
+    }
+
+    // Version check
+    const checkBtn = document.getElementById('sidebarCheckUpdate');
+    if (checkBtn) {
+      checkBtn.addEventListener('click', () => this.checkVersion(false));
     }
   },
 
@@ -202,6 +211,100 @@ const App = {
     this._toastTimer = setTimeout(() => {
       el.classList.remove('show');
     }, 2000);
+  },
+
+  async checkVersion(silent) {
+    const btn = document.getElementById('sidebarCheckUpdate');
+    if (btn) {
+      btn.classList.add('checking');
+      btn.querySelector('span:last-child').textContent = '检查中...';
+    }
+
+    try {
+      const ts = Date.now();
+      const resp = await fetch(`version.json?t=${ts}`, { cache: 'no-cache' });
+      if (!resp.ok) throw new Error('fetch failed');
+      const remote = await resp.json();
+      const remoteVersion = remote.version;
+
+      const localVersion = localStorage.getItem('imSept2_version') || '0';
+      const isNew = remoteVersion !== localVersion;
+
+      if (isNew) {
+        if (silent) {
+          // Auto-check: show subtle banner
+          this._showUpdateBanner(remote);
+        } else {
+          // Manual check: show modal
+          this._showUpdateModal(remote);
+        }
+      } else {
+        if (!silent) {
+          this.toast('已是最新版本 ✅');
+        }
+      }
+
+      // Always update local version after manual check
+      if (!silent) {
+        localStorage.setItem('imSept2_version', remoteVersion);
+      }
+    } catch (err) {
+      if (!silent) {
+        this.toast('检查失败，请检查网络连接');
+      }
+    } finally {
+      if (btn) {
+        btn.classList.remove('checking');
+        btn.querySelector('span:last-child').textContent = '检查更新';
+      }
+    }
+  },
+
+  _showUpdateBanner(remote) {
+    // Remove existing banner
+    const old = document.querySelector('.update-banner');
+    if (old) old.remove();
+
+    const banner = document.createElement('div');
+    banner.className = 'update-banner';
+    banner.innerHTML = `
+      <span class="update-banner-text">🔔 发现新版本 (${remote.date})：${remote.changes}</span>
+      <div class="update-banner-actions">
+        <button class="update-banner-btn primary" onclick="App.doUpdate()">立即更新</button>
+        <button class="update-banner-btn" onclick="this.parentElement.parentElement.remove()">稍后</button>
+      </div>
+    `;
+    document.body.appendChild(banner);
+  },
+
+  _showUpdateModal(remote) {
+    this.openModal('发现新版本', `
+      <div style="text-align:center;padding:10px 0;">
+        <div style="font-size:40px;margin-bottom:12px;">🎉</div>
+        <div style="color:#694B40;margin-bottom:8px;"><strong>版本日期：${remote.date}</strong></div>
+        <div style="color:#666;margin-bottom:16px;">${remote.changes || '优化和修复'}</div>
+        <div style="font-size:13px;color:#999;">本地版本：${localStorage.getItem('imSept2_version') || '未知'}</div>
+      </div>
+    `, () => this.doUpdate());
+  },
+
+  async doUpdate() {
+    try {
+      // Clear all caches
+      const keys = await caches.keys();
+      await Promise.all(keys.map(k => caches.delete(k)));
+
+      // Unregister and re-register SW
+      if ('serviceWorker' in navigator) {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(regs.map(r => r.unregister()));
+      }
+
+      localStorage.setItem('imSept2_needRefresh', '1');
+      window.location.reload(true);
+    } catch (e) {
+      window.location.reload(true);
+    }
   }
 };
 

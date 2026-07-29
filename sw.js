@@ -1,6 +1,6 @@
 /* ===== imSept2 Service Worker ===== */
 
-const CACHE_NAME = 'imSept2-v1';
+const CACHE_NAME = 'imSept2-v2';
 const ASSETS = [
   './',
   './index.html',
@@ -9,6 +9,7 @@ const ASSETS = [
   './js/pages.js',
   './js/app.js',
   './manifest.json',
+  './version.json',
   './icons/icon.svg'
 ];
 

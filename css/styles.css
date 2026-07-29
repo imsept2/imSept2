@@ -211,6 +211,50 @@ body {
 .sidebar-footer {
   padding: 12px 8px;
   margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sidebar-check-update {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 8px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+
+.sidebar-check-update:hover {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+}
+
+.sidebar-check-update.checking {
+  pointer-events: none;
+  opacity: 0.7;
+}
+
+.sidebar-check-update .nav-emoji {
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.sidebar-check-update.checking .nav-emoji {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 .sidebar-date {
@@ -2179,3 +2223,63 @@ body {
 
 /* Selection */
 ::selection { background: var(--primary); color: var(--text); }
+
+/* ===== Update Banner ===== */
+.update-banner {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+  padding: 14px 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  max-width: 500px;
+  width: calc(100% - 40px);
+  animation: slideUp 0.3s ease;
+  flex-wrap: wrap;
+}
+
+@keyframes slideUp {
+  from { transform: translateX(-50%) translateY(20px); opacity: 0; }
+  to { transform: translateX(-50%) translateY(0); opacity: 1; }
+}
+
+.update-banner-text {
+  font-size: 14px;
+  color: #555;
+  flex: 1;
+  min-width: 0;
+}
+
+.update-banner-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.update-banner-btn {
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  cursor: pointer;
+  border: 1px solid #e0e0e0;
+  background: #f9f9f9;
+  color: #666;
+  transition: all 0.15s;
+  font-family: inherit;
+}
+
+.update-banner-btn:hover { background: #eee; }
+
+.update-banner-btn.primary {
+  background: var(--primary-deep);
+  color: #fff;
+  border-color: var(--primary-deep);
+}
+
+.update-banner-btn.primary:hover { opacity: 0.9; }
