@@ -42,10 +42,61 @@ const Pages = {
     const recentNotes = Storage.getNotes().slice(0, 3);
     const todayStr = Storage.dateToStr(new Date());
     const todayPlan = Storage.getDailyPlan(todayStr);
+    const todayFinance = Storage.getAccountingStats(todayStr);
+    const todayExercise = Storage.getExerciseRecords().filter(r => Storage.dateToStr(new Date(r.date)) === todayStr);
 
-    const weekday = ['日','一','二','三','四','五','六'][new Date().getDay()];
-    const dateStr = Storage.formatDateLong(Date.now()) + ' 星期' + weekday;
+    const now = new Date();
+    const weekday = ['日','一','二','三','四','五','六'][now.getDay()];
+    const month = now.getMonth() + 1;
+    const date = now.getDate();
+    const dateStr = `${month}月${date}日 星期${weekday}`;
 
+    // Banner stats
+    const bannerStats = [];
+    if (stats.todayNotes > 0) bannerStats.push(`📝 ${stats.todayNotes}条随手记`);
+    if (stats.todayTasks > 0) bannerStats.push(`📅 ${stats.todayTasks - stats.todayTasksDone}项待办`);
+    if (todayFinance.expense > 0 || todayFinance.income > 0) bannerStats.push(`💰 今日收支`);
+    if (todayExercise.length > 0) bannerStats.push(`🏃 今日已运动`);
+    const bannerStatsHtml = bannerStats.length > 0 ? bannerStats.join(' · ') : '开始记录你的一天吧 ✨';
+
+    // Quick entries
+    const quickEntries = [
+      { icon: '📝', label: '随手记', color: 'linear-gradient(135deg,#F4CFD6,#E8B4C0)', page: 'notes' },
+      { icon: '📅', label: '日计划', color: 'linear-gradient(135deg,#A8D5BA,#8BC9A0)', page: 'plans', subTab: 'daily' },
+      { icon: '💰', label: '记账', color: 'linear-gradient(135deg,#F0D5A8,#E8C088)', page: 'accounting', subTab: 'today' },
+      { icon: '💪', label: '运动打卡', color: 'linear-gradient(135deg,#D5C8E8,#C5B8E0)', page: 'life', subTab: 'exercise' }
+    ];
+
+    let quickHtml = '';
+    quickEntries.forEach(item => {
+      const onclick = item.subTab
+        ? `App.navigateToSubTab('${item.page}', '${item.subTab}')`
+        : `App.navigate('${item.page}')`;
+      quickHtml += `
+        <div class="home-quick-card" onclick="${onclick}">
+          <div class="home-quick-icon" style="background:${item.color}">${item.icon}</div>
+          <div class="home-quick-label">${item.label}</div>
+        </div>`;
+    });
+
+    // Overview data
+    const overviewItems = [
+      { icon: '📋', value: `${stats.todayTasksDone}/${stats.todayTasks}`, label: '今日待办', color: '#A8D5BA' },
+      { icon: '💸', value: `¥${todayFinance.expense.toFixed(1)}`, label: '今日支出', color: '#F0D5A8' },
+      { icon: '📝', value: `${stats.todayNotes}`, label: '随手记', color: '#F4CFD6' }
+    ];
+
+    let overviewHtml = '';
+    overviewItems.forEach(item => {
+      overviewHtml += `
+        <div class="home-overview-card">
+          <div class="home-overview-icon" style="background:${item.color}20;color:${item.color}">${item.icon}</div>
+          <div class="home-overview-value">${item.value}</div>
+          <div class="home-overview-label">${item.label}</div>
+        </div>`;
+    });
+
+    // Recent activity
     let activityHtml = '';
     if (recentNotes.length === 0 && todayPlan.tasks.length === 0) {
       activityHtml = this.emptyState('暂无活动，开始记录吧');
@@ -74,51 +125,21 @@ const Pages = {
     }
 
     this.container.innerHTML = `
-      <h1 class="page-title">首页</h1>
-      <p class="page-subtitle">${dateStr}</p>
-
-      <div class="stat-grid">
-        <div class="stat-card">
-          <div class="stat-icon" style="background:linear-gradient(135deg,var(--primary),var(--primary-dark));font-size:20px">📝</div>
-          <div class="stat-value">${stats.totalNotes}</div>
-          <div class="stat-label">随手记总数</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-icon" style="background:linear-gradient(135deg,var(--green),#8BC9A0);font-size:20px">✅</div>
-          <div class="stat-value">${stats.todayTasksDone}/${stats.todayTasks}</div>
-          <div class="stat-label">今日计划完成</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-icon" style="background:linear-gradient(135deg,var(--purple),#C5B8E0);font-size:20px">💧</div>
-          <div class="stat-value">${stats.totalLife}</div>
-          <div class="stat-label">生活记录</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-icon" style="background:linear-gradient(135deg,var(--amber),#E8D5A0);font-size:20px">📚</div>
-          <div class="stat-value">${stats.totalStudy}</div>
-          <div class="stat-label">学习记录</div>
-        </div>
+      <!-- Banner -->
+      <div class="home-banner">
+        <div class="home-banner-greeting">👋 你好！</div>
+        <div class="home-banner-date">今天是 ${dateStr}</div>
+        <div class="home-banner-stats">${bannerStatsHtml}</div>
       </div>
 
-      <div class="quick-actions">
-        <div class="quick-action" onclick="App.navigate('notes')">
-          <div class="quick-action-icon" style="background:linear-gradient(135deg,var(--primary),var(--primary-dark));font-size:22px">📝</div>
-          <div class="quick-action-label">写随手记</div>
-        </div>
-        <div class="quick-action" onclick="App.navigate('plans')">
-          <div class="quick-action-icon" style="background:linear-gradient(135deg,var(--green),#8BC9A0);font-size:22px">📅</div>
-          <div class="quick-action-label">今日计划</div>
-        </div>
-        <div class="quick-action" onclick="App.navigate('life')">
-          <div class="quick-action-icon" style="background:linear-gradient(135deg,var(--purple),#C5B8E0);font-size:22px">💧</div>
-          <div class="quick-action-label">记录生活</div>
-        </div>
-        <div class="quick-action" onclick="App.navigate('study')">
-          <div class="quick-action-icon" style="background:linear-gradient(135deg,var(--amber),#E8D5A0);font-size:22px">📚</div>
-          <div class="quick-action-label">去学习</div>
-        </div>
-      </div>
+      <!-- Quick Entries -->
+      <div class="home-quick-grid">${quickHtml}</div>
 
+      <!-- Today's Overview -->
+      <div class="home-section-title">今日概览</div>
+      <div class="home-overview-grid">${overviewHtml}</div>
+
+      <!-- Recent Activity -->
       <div class="card">
         <div class="section-header"><h2>最近动态</h2></div>
         ${activityHtml}
@@ -134,19 +155,74 @@ const Pages = {
     editingId: null
   },
 
-  AVATARS: [
-    { id: 'cat', emoji: '🐱', name: '猫咪' },
-    { id: 'dog', emoji: '🐶', name: '狗狗' },
-    { id: 'bear', emoji: '🐻', name: '小熊' },
-    { id: 'rabbit', emoji: '🐰', name: '兔兔' },
-    { id: 'fox', emoji: '🦊', name: '狐狸' },
-    { id: 'panda', emoji: '🐼', name: '熊猫' },
-    { id: 'tiger', emoji: '🐯', name: '老虎' },
-    { id: 'penguin', emoji: '🐧', name: '企鹅' }
+  AVATAR_PRESETS: [
+    // 动物
+    { id: 'cat', emoji: '🐱', cat: '动物' },
+    { id: 'dog', emoji: '🐶', cat: '动物' },
+    { id: 'bear', emoji: '🐻', cat: '动物' },
+    { id: 'rabbit', emoji: '🐰', cat: '动物' },
+    { id: 'fox', emoji: '🦊', cat: '动物' },
+    { id: 'panda', emoji: '🐼', cat: '动物' },
+    { id: 'tiger', emoji: '🐯', cat: '动物' },
+    { id: 'penguin', emoji: '🐧', cat: '动物' },
+    { id: 'koala', emoji: '🐨', cat: '动物' },
+    { id: 'frog', emoji: '🐸', cat: '动物' },
+    { id: 'monkey', emoji: '🐵', cat: '动物' },
+    { id: 'lion', emoji: '🦁', cat: '动物' },
+    { id: 'cow', emoji: '🐮', cat: '动物' },
+    { id: 'pig', emoji: '🐷', cat: '动物' },
+    { id: 'hamster', emoji: '🐹', cat: '动物' },
+    // 人物
+    { id: 'girl', emoji: '👩', cat: '人物' },
+    { id: 'boy', emoji: '👨', cat: '人物' },
+    { id: 'child', emoji: '👧', cat: '人物' },
+    { id: 'baby', emoji: '👶', cat: '人物' },
+    // 自然
+    { id: 'flower1', emoji: '🌸', cat: '自然' },
+    { id: 'flower2', emoji: '🌺', cat: '自然' },
+    { id: 'sunflower', emoji: '🌻', cat: '自然' },
+    { id: 'rose', emoji: '🌹', cat: '自然' },
+    { id: 'clover', emoji: '🍀', cat: '自然' },
+    { id: 'moon', emoji: '🌙', cat: '自然' },
+    { id: 'star1', emoji: '⭐', cat: '自然' },
+    { id: 'sun', emoji: '☀️', cat: '自然' },
+    // 食物
+    { id: 'apple', emoji: '🍎', cat: '食物' },
+    { id: 'orange', emoji: '🍊', cat: '食物' },
+    { id: 'lemon', emoji: '🍋', cat: '食物' },
+    { id: 'grape', emoji: '🍇', cat: '食物' },
+    { id: 'strawberry', emoji: '🍓', cat: '食物' },
+    { id: 'peach', emoji: '🍑', cat: '食物' },
+    // 趣味
+    { id: 'gem', emoji: '💎', cat: '趣味' },
+    { id: 'ribbon', emoji: '🎀', cat: '趣味' },
+    { id: 'sparkle', emoji: '✨', cat: '趣味' },
+    { id: 'star2', emoji: '💫', cat: '趣味' },
+    { id: 'music', emoji: '🎵', cat: '趣味' },
+    { id: 'robot', emoji: '🤖', cat: '趣味' },
+    { id: 'ghost', emoji: '👻', cat: '趣味' },
+    { id: 'poop', emoji: '💩', cat: '趣味' },
+    { id: 'pumpkin', emoji: '🎃', cat: '趣味' },
   ],
 
+  _findAvatar(avatarId) {
+    if (!avatarId) return { emoji: '🐱' };
+    if (avatarId.startsWith('custom:')) return { emoji: avatarId.replace('custom:', '') };
+    if (avatarId.startsWith('photo:')) return { emoji: '🖼️', photoUrl: avatarId.replace('photo:', '') };
+    return this.AVATAR_PRESETS.find(a => a.id === avatarId) || this.AVATAR_PRESETS[0];
+  },
+
   DEVICES: ['iPhone', 'Android', 'iPad', 'MacBook', 'Windows PC', 'Web'],
-  IPS: ['北京', '上海', '广州', '深圳', '杭州', '成都', '武汉', '西安', '南京', '重庆'],
+  IPS: [
+    '北京', '天津', '上海', '重庆',
+    '河北', '山西', '辽宁', '吉林', '黑龙江',
+    '江苏', '浙江', '安徽', '福建', '江西', '山东',
+    '河南', '湖北', '湖南', '广东', '海南',
+    '四川', '贵州', '云南', '陕西', '甘肃', '青海',
+    '内蒙古', '广西', '西藏', '宁夏', '新疆',
+    '香港', '澳门', '台湾',
+    '韩国', '日本', '英国', '美国', '法国', '德国'
+  ],
 
   page_notes() {
     const state = this.noteState;
@@ -167,11 +243,6 @@ const Pages = {
         <span style="font-size:12px;color:#999">点击返回全部</span>
       </div>`;
     }
-
-    // Today overview
-    const todayStr = Storage.dateToStr(new Date());
-    const todayNotes = Storage.getNotesByDate(todayStr);
-    const photoCount = todayNotes.reduce((s, n) => s + (n.images?.length || 0), 0);
 
     // Feed
     let notes;
@@ -219,30 +290,6 @@ const Pages = {
           ${dateBtnHtml}
         </div>
 
-        <div class="note-overview-card">
-          <div class="note-overview-title">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#333" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-            <span>今日概览</span>
-          </div>
-          <div class="note-overview-grid">
-            <div class="note-overview-item">
-              <div class="note-overview-icon">📷</div>
-              <div class="note-overview-num">${photoCount}</div>
-              <div class="note-overview-label">照片</div>
-            </div>
-            <div class="note-overview-item">
-              <div class="note-overview-icon">📝</div>
-              <div class="note-overview-num">${todayNotes.length}</div>
-              <div class="note-overview-label">日记</div>
-            </div>
-            <div class="note-overview-item" onclick="Pages.openNoteModal()">
-              <div class="note-overview-icon" style="background:#111;color:#fff">✏️</div>
-              <div class="note-overview-num" style="font-size:12px;color:#666">新建</div>
-              <div class="note-overview-label">写日记</div>
-            </div>
-          </div>
-        </div>
-
         <div class="notes-feed">${feedHtml}</div>
       </div>
     `;
@@ -281,7 +328,7 @@ const Pages = {
 
   _renderNoteFeed(notes) {
     return notes.map(n => {
-      const avatar = this.AVATARS.find(a => a.id === n.avatarId) || this.AVATARS[0];
+      const avatar = this._findAvatar(n.avatarId);
       const pubDate = new Date(n.publishTime || n.timestamp);
       const timeStr = this._formatWeiboTime(pubDate);
       const deviceStr = n.device ? `来自 ${n.device}` : '';
@@ -302,9 +349,9 @@ const Pages = {
       if (n.comments && n.comments.length > 0) {
         commentsHtml = `<div class="note-comments">
           ${n.comments.map(c => {
-            const cAvatar = this.AVATARS.find(a => a.id === c.avatarId) || this.AVATARS[0];
+            const cAvatar = this._findAvatar(c.avatarId);
             return `<div class="note-comment-item">
-              <div class="note-comment-avatar">${cAvatar.emoji}</div>
+              <div class="note-comment-avatar">${cAvatar.photoUrl ? `<img src="${cAvatar.photoUrl}" style="width:100%;height:100%;border-radius:50%;object-fit:cover">` : cAvatar.emoji}</div>
               <div class="note-comment-body">
                 <div class="note-comment-name">${this.esc(c.nickname || '主人')}</div>
                 <div class="note-comment-text">${this.esc(c.text)}</div>
@@ -320,7 +367,7 @@ const Pages = {
 
       return `<div class="weibo-card" data-id="${n.id}">
         <div class="weibo-header">
-          <div class="weibo-avatar">${avatar.emoji}</div>
+          <div class="weibo-avatar">${avatar.photoUrl ? `<img src="${avatar.photoUrl}" style="width:100%;height:100%;border-radius:50%;object-fit:cover">` : avatar.emoji}</div>
           <div class="weibo-meta">
             <div class="weibo-name">${this.esc(n.nickname || '主人')}</div>
             <div class="weibo-sub">
@@ -330,9 +377,20 @@ const Pages = {
               ${locationStr}
             </div>
           </div>
-          <div class="weibo-more">
-            <button class="weibo-more-btn" onclick="Pages.openNoteModal('${n.id}')">编辑</button>
-            <button class="weibo-more-btn delete" onclick="Pages.deleteNote('${n.id}')">删除</button>
+          <div class="weibo-dropdown" id="dropdown-${n.id}">
+            <button class="weibo-dropdown-btn" onclick="Pages.toggleDropdown('${n.id}', event)">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            <div class="weibo-dropdown-menu" id="dropdown-menu-${n.id}">
+              <div class="weibo-dropdown-item" onclick="Pages.openNoteModal('${n.id}');Pages.closeDropdown('${n.id}')">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                编辑
+              </div>
+              <div class="weibo-dropdown-item delete" onclick="Pages.deleteNote('${n.id}');Pages.closeDropdown('${n.id}')">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                删除
+              </div>
+            </div>
           </div>
         </div>
         <div class="weibo-content">${this.esc(n.content)}</div>
@@ -407,6 +465,32 @@ const Pages = {
     }
   },
 
+  toggleDropdown(noteId, event) {
+    event.stopPropagation();
+    const menu = document.getElementById(`dropdown-menu-${noteId}`);
+    const btn = document.querySelector(`#dropdown-${noteId} .weibo-dropdown-btn`);
+    const isOpen = menu && menu.classList.contains('show');
+    // Close all dropdowns first
+    document.querySelectorAll('.weibo-dropdown-menu').forEach(m => m.classList.remove('show'));
+    document.querySelectorAll('.weibo-dropdown-btn').forEach(b => b.classList.remove('active'));
+    if (!isOpen && menu && btn) {
+      menu.classList.add('show');
+      btn.classList.add('active');
+    }
+  },
+
+  closeDropdown(noteId) {
+    const menu = document.getElementById(`dropdown-menu-${noteId}`);
+    const btn = document.querySelector(`#dropdown-${noteId} .weibo-dropdown-btn`);
+    if (menu) menu.classList.remove('show');
+    if (btn) btn.classList.remove('active');
+  },
+
+  closeAllDropdowns() {
+    document.querySelectorAll('.weibo-dropdown-menu').forEach(m => m.classList.remove('show'));
+    document.querySelectorAll('.weibo-dropdown-btn').forEach(b => b.classList.remove('active'))
+  },
+
   toggleLike(id) {
     Storage.toggleNoteLike(id);
     // Re-render only the card to avoid scroll jump
@@ -477,13 +561,25 @@ const Pages = {
     const pubDate = note ? new Date(note.publishTime || note.timestamp) : new Date();
     const dateVal = Storage.dateToStr(pubDate) + 'T' + String(pubDate.getHours()).padStart(2, '0') + ':' + String(pubDate.getMinutes()).padStart(2, '0');
 
-    const avatarOptions = this.AVATARS.map(a =>
-      `<label class="note-avatar-option ${(note?.avatarId || 'cat') === a.id ? 'selected' : ''}">
-        <input type="radio" name="noteAvatar" value="${a.id}" ${(note?.avatarId || 'cat') === a.id ? 'checked' : ''}>
-        <span class="note-avatar-emoji">${a.emoji}</span>
-        <span class="note-avatar-name">${a.name}</span>
-      </label>`
+    // Build emoji picker with categories
+    const cats = [...new Set(this.AVATAR_PRESETS.map(a => a.cat))];
+    const currentAvatarId = note?.avatarId || '';
+    let isCustomEmoji = currentAvatarId.startsWith('custom:');
+    let isPhoto = currentAvatarId.startsWith('photo:');
+    let customEmoji = isCustomEmoji ? currentAvatarId.replace('custom:', '') : '';
+    let photoPreview = isPhoto ? currentAvatarId.replace('photo:', '') : '';
+
+    let emojiTabs = cats.map((cat, i) =>
+      `<span class="note-emoji-tab ${i === 0 ? 'active' : ''}" onclick="Pages._switchEmojiTab(this, '${cat}')">${cat}</span>`
     ).join('');
+
+    let emojiPanels = cats.map((cat, i) => {
+      const items = this.AVATAR_PRESETS.filter(a => a.cat === cat).map(a => {
+        const sel = currentAvatarId === a.id ? ' selected' : '';
+        return `<span class="note-emoji-item${sel}" data-av="${a.id}" onclick="Pages._selectEmoji(this, '${a.id}')">${a.emoji}</span>`;
+      }).join('');
+      return `<div class="note-emoji-panel${i === 0 ? '' : ' hidden'}" data-cat="${cat}">${items}</div>`;
+    }).join('');
 
     const deviceOptions = this.DEVICES.map(d =>
       `<option value="${d}" ${note?.device === d ? 'selected' : ''}>${d}</option>`
@@ -535,7 +631,20 @@ const Pages = {
 
         <div class="note-modal-section">
           <div class="note-modal-label">头像</div>
-          <div class="note-avatar-options">${avatarOptions}</div>
+          <div class="note-avatar-picker">
+            <div class="note-emoji-tabs">${emojiTabs}</div>
+            <div class="note-emoji-panels">${emojiPanels}</div>
+            <div class="note-avatar-custom-row">
+              <div class="note-custom-emoji-wrap">
+                <input type="text" class="input note-custom-emoji-input" id="nmCustomEmoji" placeholder="自定义 emoji（如 🎭）" value="${customEmoji}" maxlength="4" oninput="Pages._onCustomEmoji(this)">
+              </div>
+              <label class="note-avatar-photo-btn" id="nmPhotoLabel">
+                ${photoPreview ? `<img src="${photoPreview}" class="note-avatar-photo-preview">更换照片` : '📷 上传头像'}
+                <input type="file" accept="image/*" style="display:none" onchange="Pages._handleAvatarPhoto(this)">
+              </label>
+            </div>
+          </div>
+          <input type="hidden" id="nmAvatarId" value="${this.esc(currentAvatarId)}">
         </div>
 
         <div class="note-modal-section">
@@ -544,6 +653,72 @@ const Pages = {
         </div>
       </div>
     `, () => this.submitNoteModal());
+  },
+
+  _switchEmojiTab(el, cat) {
+    document.querySelectorAll('.note-emoji-tab').forEach(t => t.classList.remove('active'));
+    el.classList.add('active');
+    document.querySelectorAll('.note-emoji-panel').forEach(p => p.classList.add('hidden'));
+    const panel = document.querySelector(`.note-emoji-panel[data-cat="${cat}"]`);
+    if (panel) panel.classList.remove('hidden');
+  },
+
+  _selectEmoji(el, avatarId) {
+    document.querySelectorAll('.note-emoji-item').forEach(i => i.classList.remove('selected'));
+    el.classList.add('selected');
+    document.getElementById('nmAvatarId').value = avatarId;
+    // Clear custom emoji input
+    const customInput = document.getElementById('nmCustomEmoji');
+    if (customInput) customInput.value = '';
+    // Clear photo
+    const photoLabel = document.getElementById('nmPhotoLabel');
+    if (photoLabel) {
+      const existing = photoLabel.querySelector('.note-avatar-photo-preview');
+      if (existing) existing.remove();
+      const text = photoLabel.childNodes[photoLabel.childNodes.length - 1];
+      if (text && text.nodeType === 3) text.textContent = '📷 上传头像';
+    }
+  },
+
+  _onCustomEmoji(input) {
+    const val = input.value.trim();
+    if (val) {
+      document.getElementById('nmAvatarId').value = 'custom:' + val;
+      document.querySelectorAll('.note-emoji-item').forEach(i => i.classList.remove('selected'));
+      // Clear photo
+      const photoLabel = document.getElementById('nmPhotoLabel');
+      if (photoLabel) {
+        const existing = photoLabel.querySelector('.note-avatar-photo-preview');
+        if (existing) existing.remove();
+        const text = photoLabel.childNodes[photoLabel.childNodes.length - 1];
+        if (text && text.nodeType === 3) text.textContent = '📷 上传头像';
+      }
+    }
+  },
+
+  _handleAvatarPhoto(input) {
+    const file = input.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const dataUrl = e.target.result;
+      document.getElementById('nmAvatarId').value = 'photo:' + dataUrl;
+      document.querySelectorAll('.note-emoji-item').forEach(i => i.classList.remove('selected'));
+      document.getElementById('nmCustomEmoji').value = '';
+      const label = document.getElementById('nmPhotoLabel');
+      if (label) {
+        const existing = label.querySelector('.note-avatar-photo-preview');
+        if (existing) existing.remove();
+        const img = document.createElement('img');
+        img.src = dataUrl;
+        img.className = 'note-avatar-photo-preview';
+        label.prepend(img);
+        const text = label.childNodes[label.childNodes.length - 1];
+        if (text && text.nodeType === 3) text.textContent = '更换照片';
+      }
+    };
+    reader.readAsDataURL(file);
+    input.value = '';
   },
 
   _handleNoteImages(input) {
@@ -581,8 +756,7 @@ const Pages = {
     const device = document.getElementById('nmDevice').value;
     const ip = document.getElementById('nmIp').value;
     const nickname = document.getElementById('nmNickname').value.trim() || '主人';
-    const avatarEl = document.querySelector('input[name="noteAvatar"]:checked');
-    const avatarId = avatarEl ? avatarEl.value : 'cat';
+    const avatarId = document.getElementById('nmAvatarId').value || 'cat';
     const images = this._collectNoteImages();
 
     const data = {

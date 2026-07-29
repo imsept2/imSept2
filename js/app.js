@@ -62,6 +62,13 @@ const App = {
       if (e.key === 'Escape') this.closeModal();
     });
 
+    // Close dropdowns on click outside
+    document.addEventListener('click', () => {
+      if (typeof Pages !== 'undefined' && Pages.closeAllDropdowns) {
+        Pages.closeAllDropdowns();
+      }
+    });
+
     // FAB
     const fab = document.getElementById('fab');
     if (fab) {
@@ -93,6 +100,11 @@ const App = {
 
     // Scroll to top
     window.scrollTo(0, 0);
+  },
+
+  navigateToSubTab(page, subTab) {
+    Pages.currentSubTab[page] = subTab;
+    this.navigate(page);
   },
 
   updateFab(page) {
