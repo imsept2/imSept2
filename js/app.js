@@ -214,7 +214,16 @@ const App = {
   },
 
   async checkVersion(silent) {
+    const isFile = window.location.protocol === 'file:';
     const btn = document.getElementById('sidebarCheckUpdate');
+
+    if (isFile) {
+      if (!silent) {
+        this.toast('请通过网址访问以检查更新');
+      }
+      return;
+    }
+
     if (btn) {
       btn.classList.add('checking');
       btn.querySelector('span:last-child').textContent = '检查中...';
@@ -238,15 +247,12 @@ const App = {
           // Manual check: show modal
           this._showUpdateModal(remote);
         }
+        // Save remote version so we don't keep showing the banner
+        localStorage.setItem('imSept2_version', remoteVersion);
       } else {
         if (!silent) {
           this.toast('已是最新版本 ✅');
         }
-      }
-
-      // Always update local version after manual check
-      if (!silent) {
-        localStorage.setItem('imSept2_version', remoteVersion);
       }
     } catch (err) {
       if (!silent) {
