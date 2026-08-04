@@ -62,7 +62,18 @@ const App = {
 
     // Escape key
     document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') this.closeModal();
+      if (e.key === 'Escape') {
+        this.closeModal();
+        // Close img viewer
+        const viewer = document.getElementById('imgViewer');
+        if (viewer) viewer.classList.remove('show');
+        // Close repost modal
+        const rm = document.getElementById('repostModal');
+        if (rm) rm.classList.remove('show');
+      }
+      // Image viewer arrow keys
+      if (e.key === 'ArrowLeft' && typeof Pages !== 'undefined') Pages._imgViewerNav && Pages._imgViewerNav(-1);
+      if (e.key === 'ArrowRight' && typeof Pages !== 'undefined') Pages._imgViewerNav && Pages._imgViewerNav(1);
     });
 
     // Close dropdowns on click outside

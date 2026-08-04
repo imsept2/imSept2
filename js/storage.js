@@ -135,18 +135,31 @@ const Storage = {
     }
   },
 
-  addNoteComment(noteId, text) {
+  addNoteComment(noteId, data) {
     const note = this.data.notes.find(n => n.id === noteId);
     if (note) {
       if (!note.comments) note.comments = [];
+      const text = typeof data === 'string' ? data : (data.text || '');
+      if (!text.trim()) return;
       note.comments.push({
-        id: Date.now().toString(),
+        id: Date.now().toString() + '_' + Math.floor(Math.random() * 1000),
         text: text.trim(),
         timestamp: Date.now(),
-        nickname: '主人',
-        avatarId: 'default'
+        nickname: (typeof data === 'object' && data.nickname) ? data.nickname : '主人',
+        color: (typeof data === 'object' && data.color) ? data.color : '#666'
       });
       this.save();
+    }
+  },
+
+  updateNoteComment(noteId, commentId, data) {
+    const note = this.data.notes.find(n => n.id === noteId);
+    if (note && note.comments) {
+      const c = note.comments.find(c => c.id === commentId);
+      if (c) {
+        Object.assign(c, data);
+        this.save();
+      }
     }
   },
 

@@ -338,32 +338,59 @@ const Pages = {
       let imagesHtml = '';
       if (n.images && n.images.length > 0) {
         const count = n.images.length;
+        const imagesJson = JSON.stringify(n.images).replace(/"/g, '&quot;');
         let gridClass = 'note-img-grid';
-        if (count === 1) gridClass += ' one';
-        else if (count === 2 || count === 4) gridClass += ' two';
-        else gridClass += ' three';
-        imagesHtml = `<div class="${gridClass}">${n.images.map(img => `<div class="note-img-wrap"><img src="${img}" loading="lazy" onclick="event.stopPropagation();window.open(this.src)"></div>`).join('')}</div>`;
+        let imgsHtml = '';
+        if (count === 1) {
+          gridClass += ' one';
+          imgsHtml = `<div class="note-img-wrap single" data-idx="0" data-images="${imagesJson}" onclick="Pages.openImgViewer(this)"><img src="${n.images[0]}" loading="lazy"></div>`;
+        } else {
+          // 2图及以上：1:1 比例
+          if (count === 2) gridClass += ' two';
+          else if (count === 4) gridClass += ' four';
+          else if (count === 6 || count === 9) gridClass += (count === 9 ? ' nine' : ' six');
+          else if (count <= 4) gridClass += ' two';
+          else gridClass += ' three';
+          imgsHtml = n.images.map((img, i) => `<div class="note-img-wrap" data-idx="${i}" data-images="${imagesJson}" onclick="Pages.openImgViewer(this)"><img src="${img}" loading="lazy"></div>`).join('');
+        }
+        imagesHtml = `<div class="${gridClass}">${imgsHtml}</div>`;
+      }
+
+      // 转发提示（原帖有转发时显示）
+      let repostIndicator = '';
+      if (n.repostedFrom) {
+        const src = n.repostedFrom;
+        const srcAvatar = this._findAvatar(src.avatarId);
+        repostIndicator = `
+          <div class="note-repost-quote">
+            <div class="note-repost-header">
+              <div class="note-repost-avatar">${srcAvatar.photoUrl ? `<img src="${srcAvatar.photoUrl}" style="width:100%;height:100%;border-radius:50%;object-fit:cover">` : srcAvatar.emoji}</div>
+              <div class="note-repost-name">${this.esc(src.nickname || '主人')}</div>
+              <div class="note-repost-time">${src.dateStr || ''}</div>
+            </div>
+            <div class="note-repost-content">${this.esc(src.content || '')}</div>
+          </div>`;
       }
 
       let commentsHtml = '';
       if (n.comments && n.comments.length > 0) {
         commentsHtml = `<div class="note-comments">
           ${n.comments.map(c => {
-            const cAvatar = this._findAvatar(c.avatarId);
+            const color = c.color || '#666';
             return `<div class="note-comment-item">
-              <div class="note-comment-avatar">${cAvatar.photoUrl ? `<img src="${cAvatar.photoUrl}" style="width:100%;height:100%;border-radius:50%;object-fit:cover">` : cAvatar.emoji}</div>
               <div class="note-comment-body">
-                <div class="note-comment-name">${this.esc(c.nickname || '主人')}</div>
-                <div class="note-comment-text">${this.esc(c.text)}</div>
-                <div class="note-comment-time">${Storage.formatDate(c.timestamp)}</div>
+                <span class="note-comment-name" style="color:${this.esc(color)}">${this.esc(c.nickname || '主人')}</span>
+                <span class="note-comment-colon">：</span>
+                <span class="note-comment-text">${this.esc(c.text)}</span>
+                <div class="note-comment-foot">
+                  <span class="note-comment-time">${Storage.formatDate(c.timestamp)}</span>
+                  <button class="note-comment-del" onclick="Pages.deleteComment('${n.id}', '${c.id}')">删除</button>
+                </div>
               </div>
-              <button class="note-comment-del" onclick="Pages.deleteComment('${n.id}', '${c.id}')">删除</button>
             </div>`;
           }).join('')}
         </div>`;
       }
-
-      const viewsStr = (n.views || 0) > 0 ? this._formatCount(n.views) : '';
 
       return `<div class="weibo-card" data-id="${n.id}">
         <div class="weibo-header">
@@ -395,27 +422,31 @@ const Pages = {
         </div>
         <div class="weibo-content">${this.esc(n.content)}</div>
         ${imagesHtml}
+        ${repostIndicator}
         <div class="weibo-footer">
-          <div class="weibo-action" onclick="Pages.repostNote('${n.id}')">
+          <div class="weibo-action" onclick="Pages.openRepostModal('${n.id}')">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
-            <span>${n.reposts || '转发'}</span>
+            <span>${n.reposts ? this._formatCount(n.reposts) : 'Repost'}</span>
           </div>
           <div class="weibo-action" onclick="Pages.toggleCommentBox('${n.id}')">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
-            <span>${(n.comments?.length || 0) > 0 ? n.comments.length : '评论'}</span>
+            <span>${(n.comments?.length || 0) > 0 ? n.comments.length : 'Comment'}</span>
           </div>
           <div class="weibo-action ${n.likedByMe ? 'liked' : ''}" onclick="Pages.toggleLike('${n.id}')">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="${n.likedByMe ? '#E6162D' : 'none'}" stroke="${n.likedByMe ? '#E6162D' : 'currentColor'}" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
-            <span>${n.likes || '赞'}</span>
+            <span>${n.likes ? this._formatCount(n.likes) : 'Like'}</span>
           </div>
-          ${viewsStr ? `<div class="weibo-views">${viewsStr} 浏览</div>` : ''}
         </div>
-        <div class="note-comment-box" id="comment-box-${n.id}" style="display:none">
+        ${commentsHtml}
+        <div class="note-comment-input-box" id="comment-box-${n.id}" style="display:none">
+          <div class="note-comment-author-row">
+            <input class="note-comment-author-name" id="comment-name-${n.id}" placeholder="昵称" maxlength="10" value="主人">
+            <input type="color" class="note-comment-author-color" id="comment-color-${n.id}" value="#666666" title="昵称颜色">
+          </div>
           <div class="note-comment-input-wrap">
             <input class="note-comment-input" id="comment-input-${n.id}" placeholder="写下你的评论..." onkeydown="if(event.key==='Enter')Pages.submitComment('${n.id}')">
             <button class="note-comment-send" onclick="Pages.submitComment('${n.id}')">发送</button>
           </div>
-          ${commentsHtml}
         </div>
       </div>`;
     }).join('');
@@ -507,14 +538,9 @@ const Pages = {
     }
   },
 
+  // 旧接口保留（兼容）
   repostNote(id) {
-    const note = Storage.data.notes.find(n => n.id === id);
-    if (note) {
-      note.reposts = (note.reposts || 0) + 1;
-      Storage.save();
-      App.toast('转发成功');
-      this.render('notes');
-    }
+    this.openRepostModal(id);
   },
 
   toggleCommentBox(noteId) {
@@ -536,7 +562,13 @@ const Pages = {
     if (!input) return;
     const text = input.value.trim();
     if (!text) return;
-    Storage.addNoteComment(noteId, text);
+    const nameInput = document.getElementById(`comment-name-${noteId}`);
+    const colorInput = document.getElementById(`comment-color-${noteId}`);
+    Storage.addNoteComment(noteId, {
+      text,
+      nickname: nameInput ? nameInput.value.trim() || '主人' : '主人',
+      color: colorInput ? colorInput.value : '#666666'
+    });
     input.value = '';
     this.render('notes');
     // Re-open comment box after render
@@ -551,6 +583,158 @@ const Pages = {
       Storage.deleteNoteComment(noteId, commentId);
       this.render('notes');
     }
+  },
+
+  // 图片灯箱
+  openImgViewer(el) {
+    const imagesJson = el.dataset.images.replace(/&quot;/g, '"');
+    const images = JSON.parse(imagesJson);
+    const idx = parseInt(el.dataset.idx) || 0;
+    let viewer = document.getElementById('imgViewer');
+    if (!viewer) {
+      viewer = document.createElement('div');
+      viewer.id = 'imgViewer';
+      viewer.className = 'img-viewer';
+      viewer.innerHTML = `
+        <button class="img-viewer-close">×</button>
+        <button class="img-viewer-prev">‹</button>
+        <button class="img-viewer-next">›</button>
+        <div class="img-viewer-counter"></div>
+        <div class="img-viewer-body"></div>
+      `;
+      document.body.appendChild(viewer);
+      // Bind close
+      viewer.querySelector('.img-viewer-close').onclick = () => viewer.classList.remove('show');
+      viewer.onclick = (e) => {
+        if (e.target === viewer || e.target.classList.contains('img-viewer-body')) {
+          viewer.classList.remove('show');
+        }
+      };
+      // Bind nav
+      viewer.querySelector('.img-viewer-prev').onclick = () => this._imgViewerNav(-1);
+      viewer.querySelector('.img-viewer-next').onclick = () => this._imgViewerNav(1);
+    }
+    viewer._images = images;
+    viewer._idx = idx;
+    this._imgViewerRender();
+    viewer.classList.add('show');
+  },
+
+  _imgViewerRender() {
+    const viewer = document.getElementById('imgViewer');
+    if (!viewer || !viewer._images) return;
+    const body = viewer.querySelector('.img-viewer-body');
+    body.innerHTML = `<img src="${viewer._images[viewer._idx]}">`;
+    viewer.querySelector('.img-viewer-counter').textContent =
+      viewer._images.length > 1 ? `${viewer._idx + 1} / ${viewer._images.length}` : '';
+    viewer.querySelector('.img-viewer-prev').style.display = viewer._images.length > 1 ? '' : 'none';
+    viewer.querySelector('.img-viewer-next').style.display = viewer._images.length > 1 ? '' : 'none';
+  },
+
+  _imgViewerNav(delta) {
+    const viewer = document.getElementById('imgViewer');
+    if (!viewer || !viewer._images) return;
+    viewer._idx = (viewer._idx + delta + viewer._images.length) % viewer._images.length;
+    this._imgViewerRender();
+  },
+
+  // 转发弹窗（含原文预览）
+  openRepostModal(noteId) {
+    const note = Storage.data.notes.find(n => n.id === noteId);
+    if (!note) return;
+    const avatar = this._findAvatar(note.avatarId);
+    const pubDate = new Date(note.publishTime || note.timestamp);
+    const timeStr = this._formatWeiboTime(pubDate);
+
+    let modal = document.getElementById('repostModal');
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'repostModal';
+      modal.className = 'modal-overlay repost-modal';
+      document.body.appendChild(modal);
+    }
+    modal.innerHTML = `
+      <div class="modal" onclick="event.stopPropagation()">
+        <div class="modal-header">
+          <span>转发</span>
+          <button class="modal-close" onclick="Pages.closeRepostModal()">×</button>
+        </div>
+        <div class="modal-body">
+          <textarea class="repost-text" id="repostText" placeholder="说点什么吧（可选）..." rows="3"></textarea>
+          <div class="repost-author-row">
+            <input type="text" class="repost-author-name" id="repostName" placeholder="昵称" value="主人" maxlength="10">
+            <input type="color" class="repost-author-color" id="repostColor" value="#666666">
+            <select class="repost-author-device" id="repostDevice">
+              <option value="">-- 设备 --</option>
+              <option>iPhone 客户端</option>
+              <option>iPad 客户端</option>
+              <option>Android 客户端</option>
+              <option>HUAWEI 客户端</option>
+              <option>微博网页版</option>
+              <option>HarmonyOS 客户端</option>
+            </select>
+          </div>
+          <div class="repost-source" id="repostSource">
+            <div class="repost-source-header">
+              <div class="repost-source-avatar">${avatar.photoUrl ? `<img src="${avatar.photoUrl}" style="width:100%;height:100%;border-radius:50%;object-fit:cover">` : avatar.emoji}</div>
+              <div class="repost-source-name">${this.esc(note.nickname || '主人')}</div>
+              <div class="repost-source-time">${timeStr}</div>
+            </div>
+            <div class="repost-source-content">${this.esc(note.content)}</div>
+            ${(note.images && note.images.length > 0)
+              ? `<div class="repost-source-images">${(() => { const ij = JSON.stringify(note.images).replace(/"/g, '&quot;'); return note.images.map((img, i) => `<img src="${img}" data-idx="${i}" data-images="${ij}" onclick="Pages.openImgViewer(this)">`).join(''); })()}</div>`
+              : ''}
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-primary" id="repostSubmitBtn">发送</button>
+        </div>
+      </div>
+    `;
+    modal.classList.add('show');
+    modal.onclick = () => this.closeRepostModal();
+    modal.querySelector('.modal').onclick = (e) => e.stopPropagation();
+    modal.querySelector('#repostSubmitBtn').onclick = () => this.submitRepost(noteId);
+    modal.querySelector('#repostText').focus();
+  },
+
+  closeRepostModal() {
+    const modal = document.getElementById('repostModal');
+    if (modal) modal.classList.remove('show');
+  },
+
+  submitRepost(noteId) {
+    const srcNote = Storage.data.notes.find(n => n.id === noteId);
+    if (!srcNote) return;
+    const text = document.getElementById('repostText').value.trim();
+    const nickname = document.getElementById('repostName').value.trim() || '主人';
+    const color = document.getElementById('repostColor').value;
+    const device = document.getElementById('repostDevice').value;
+    const srcAvatar = this._findAvatar(srcNote.avatarId);
+    const srcPubDate = new Date(srcNote.publishTime || srcNote.timestamp);
+    const m = String(srcPubDate.getMonth() + 1).padStart(2, '0');
+    const d = String(srcPubDate.getDate()).padStart(2, '0');
+    const srcDateStr = `${srcPubDate.getFullYear()}-${m}-${d}`;
+    const repostedFrom = {
+      nickname: srcNote.nickname || '主人',
+      avatarId: srcNote.avatarId,
+      content: srcNote.content,
+      images: srcNote.images || [],
+      dateStr: srcDateStr
+    };
+    Storage.addNote({
+      content: text || '转发',
+      nickname,
+      color,
+      device,
+      repostedFrom,
+      avatarId: 'default'
+    });
+    srcNote.reposts = (srcNote.reposts || 0) + 1;
+    Storage.save();
+    this.closeRepostModal();
+    App.toast('已转发');
+    this.render('notes');
   },
 
   openNoteModal(id) {
