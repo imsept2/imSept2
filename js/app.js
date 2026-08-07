@@ -59,6 +59,12 @@ const App = {
     document.getElementById('modalOverlay').addEventListener('click', (e) => {
       if (e.target.id === 'modalOverlay') this.closeModal();
     });
+    // Dynamic modals - click outside to close
+    document.addEventListener('click', (e) => {
+      if (e.target.classList && e.target.classList.contains('modal-overlay') && e.target.id !== 'modalOverlay') {
+        e.target.remove();
+      }
+    });
 
     // Escape key
     document.addEventListener('keydown', (e) => {
@@ -211,7 +217,12 @@ const App = {
   },
 
   closeModal() {
-    document.getElementById('modalOverlay').classList.remove('show');
+    const mainModal = document.getElementById('modalOverlay');
+    if (mainModal) mainModal.classList.remove('show');
+    // 移除动态创建的弹窗
+    document.querySelectorAll('.modal-overlay').forEach(m => {
+      if (m.id !== 'modalOverlay') m.remove();
+    });
   },
 
   toast(msg) {

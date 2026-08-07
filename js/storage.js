@@ -600,6 +600,32 @@ const Storage = {
     }
   },
 
+  updateTransaction(id, updates) {
+    if (this.data.accounting?.transactions) {
+      const tx = this.data.accounting.transactions.find(t => t.id === id);
+      if (tx) {
+        Object.assign(tx, updates);
+        this.save();
+      }
+    }
+  },
+
+  addTransactions(records) {
+    if (!this.data.accounting) this.data.accounting = { transactions: [] };
+    if (!this.data.accounting.transactions) this.data.accounting.transactions = [];
+    const existingIds = new Set(this.data.accounting.transactions.map(t => t.wxTradeId).filter(Boolean));
+    let imported = 0, skipped = 0;
+    records.forEach(r => {
+      if (r.wxTradeId && existingIds.has(r.wxTradeId)) { skipped++; return; }
+      r.id = Date.now().toString() + '_' + Math.random().toString(36).slice(2, 6);
+      if (r.wxTradeId) existingIds.add(r.wxTradeId);
+      this.data.accounting.transactions.push(r);
+      imported++;
+    });
+    this.save();
+    return { imported, skipped };
+  },
+
   getAccountingStats(dateStr) {
     const txs = dateStr ? this.getTransactionsByDate(dateStr) : this.getTransactions();
     const income = txs.filter(t => t.type === 'income').reduce((s, t) => s + (parseFloat(t.amount) || 0), 0);

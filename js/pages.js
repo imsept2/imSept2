@@ -2338,8 +2338,16 @@ const Pages = {
     else if (tab === 'savings') contentHtml = this.renderAccountingSavings();
 
     this.container.innerHTML = `
-      <h1 class="page-title">记账</h1>
-      <p class="page-subtitle">记录每一天收入、消费、储蓄</p>
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <div>
+          <h1 class="page-title">记账</h1>
+          <p class="page-subtitle">记录每一天收入、消费、储蓄</p>
+        </div>
+        <button class="btn btn-primary" onclick="Pages.triggerWechatImport()" style="white-space:nowrap;font-size:13px;padding:8px 14px">
+          📥 导入微信账单
+        </button>
+      </div>
+      <input type="file" id="wechatCsvInput" accept=".csv,text/csv" style="display:none" onchange="Pages.handleWechatCsv(this)">
       ${contentHtml}
     `;
   },
@@ -2359,12 +2367,17 @@ const Pages = {
           <div class="transaction-emoji">${emoji}</div>
           <div class="transaction-content">
             <div class="transaction-title">${this.esc(t.category)}${t.location ? ' · ' + this.esc(t.location) : ''}</div>
-            <div class="transaction-detail">${this.esc(t.payment || '现金')} · ${Storage.formatDate(t.date)}${t.notes ? ' · ' + this.esc(t.notes) : ''}</div>
+            <div class="transaction-detail">${this.esc(t.payment || '现金')} · ${Storage.formatDate(t.date)}${t.notes ? ' · ' + this.esc(t.notes) : ''}${t.imported ? ' · 📥' : ''}</div>
           </div>
           <div class="transaction-amount ${isIncome ? 'income' : 'expense'}">${sign}¥${this.esc(t.amount)}</div>
-          <button class="btn-ghost btn-icon" onclick="Pages.deleteTransaction('${t.id}')">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-          </button>
+          <div class="transaction-actions">
+            <button class="btn-ghost btn-icon" onclick="Pages.editTransaction('${t.id}')" title="编辑">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            </button>
+            <button class="btn-ghost btn-icon" onclick="Pages.deleteTransaction('${t.id}')" title="删除">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
         </div>`;
       }).join('') + '</div>';
     }
@@ -2507,12 +2520,17 @@ const Pages = {
           <div class="transaction-emoji">${emoji}</div>
           <div class="transaction-content">
             <div class="transaction-title">${this.esc(t.category)}${t.location ? ' · ' + this.esc(t.location) : ''}</div>
-            <div class="transaction-detail">${this.esc(t.payment || '现金')}${t.notes ? ' · ' + this.esc(t.notes) : ''}</div>
+            <div class="transaction-detail">${this.esc(t.payment || '现金')}${t.notes ? ' · ' + this.esc(t.notes) : ''}${t.imported ? ' · 📥' : ''}</div>
           </div>
           <div class="transaction-amount ${isIncome ? 'income' : 'expense'}">${sign}¥${this.esc(t.amount)}</div>
-          <button class="btn-ghost btn-icon" onclick="Pages.deleteTransaction('${t.id}')">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-          </button>
+          <div class="transaction-actions">
+            <button class="btn-ghost btn-icon" onclick="Pages.editTransaction('${t.id}')" title="编辑">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            </button>
+            <button class="btn-ghost btn-icon" onclick="Pages.deleteTransaction('${t.id}')" title="删除">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
         </div>`;
       });
       listHtml += '</div>';
@@ -2709,6 +2727,246 @@ const Pages = {
     return map[category];
   },
 
+  // ===== 微信账单导入 =====
+  triggerWechatImport() {
+    document.getElementById('wechatCsvInput').click();
+  },
+
+  handleWechatCsv(input) {
+    const file = input.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      let text = e.target.result;
+      // 尝试检测编码，如果乱码则用GBK重读
+      if (text.includes('�')) {
+        const reader2 = new FileReader();
+        reader2.onload = (e2) => {
+          this.parseWechatCSV(e2.target.result);
+        };
+        reader2.readAsText(file, 'GBK');
+      } else {
+        this.parseWechatCSV(text);
+      }
+    };
+    reader.readAsText(file, 'UTF-8');
+    input.value = '';
+  },
+
+  parseWechatCSV(text) {
+    const lines = text.split(/\r?\n/);
+    // 找到列头行（包含"交易时间"的行）
+    let headerIdx = -1;
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i].includes('交易时间') && lines[i].includes('收/支')) {
+        headerIdx = i;
+        break;
+      }
+    }
+    if (headerIdx === -1) {
+      App.toast('未识别到微信账单格式，请确认文件正确');
+      return;
+    }
+
+    const headers = this._parseCsvLine(lines[headerIdx]);
+    // 找到各列索引
+    const colMap = {};
+    headers.forEach((h, i) => {
+      const h2 = h.trim();
+      if (h2.includes('交易时间')) colMap.time = i;
+      else if (h2.includes('交易类型')) colMap.type = i;
+      else if (h2.includes('交易对方')) colMap.merchant = i;
+      else if (h2.includes('商品')) colMap.goods = i;
+      else if (h2.includes('收/支')) colMap.flow = i;
+      else if (h2.includes('金额')) colMap.amount = i;
+      else if (h2.includes('支付方式')) colMap.payment = i;
+      else if (h2.includes('当前状态')) colMap.status = i;
+      else if (h2.includes('交易单号')) colMap.tradeId = i;
+      else if (h2.includes('备注')) colMap.remark = i;
+    });
+
+    const transactions = [];
+    for (let i = headerIdx + 1; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (!line || line.startsWith('-') || line.includes('微信支付账单')) continue;
+      const cols = this._parseCsvLine(line);
+      if (cols.length < 5) continue;
+
+      const flow = (cols[colMap.flow] || '').trim();
+      const amountStr = (cols[colMap.amount] || '').replace(/[¥￥,，\s]/g, '').trim();
+      const amount = parseFloat(amountStr);
+      if (isNaN(amount) || amount === 0) continue;
+      // 只导入收入和支出，跳过"/"（转账等）
+      if (flow !== '收入' && flow !== '支出') continue;
+
+      const status = (cols[colMap.status] || '').trim();
+      if (status && !status.includes('成功') && !status.includes('已完成')) continue;
+
+      const timeStr = (cols[colMap.time] || '').trim();
+      const date = this._parseWechatDate(timeStr);
+      const goods = (cols[colMap.goods] || '').trim();
+      const merchant = (cols[colMap.merchant] || '').trim();
+      const typeStr = (cols[colMap.type] || '').trim();
+      const category = this._mapWechatCategory(typeStr, goods, merchant);
+      const payment = this._mapWechatPayment((cols[colMap.payment] || '').trim());
+
+      transactions.push({
+        amount: amount.toFixed(2),
+        date,
+        type: flow === '收入' ? 'income' : 'expense',
+        category,
+        payment,
+        location: merchant || goods || '',
+        notes: goods && merchant && goods !== merchant ? `${goods}` : (typeStr || ''),
+        wxTradeId: (cols[colMap.tradeId] || '').trim() || undefined,
+        imported: true
+      });
+    }
+
+    if (transactions.length === 0) {
+      App.toast('未找到可导入的账单记录');
+      return;
+    }
+
+    this._showImportPreview(transactions);
+  },
+
+  _parseCsvLine(line) {
+    const result = [];
+    let current = '';
+    let inQuote = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === '"') {
+        if (inQuote && line[i + 1] === '"') { current += '"'; i++; }
+        else inQuote = !inQuote;
+      } else if (ch === ',' && !inQuote) {
+        result.push(current);
+        current = '';
+      } else {
+        current += ch;
+      }
+    }
+    result.push(current);
+    return result;
+  },
+
+  _parseWechatDate(timeStr) {
+    // 格式: 2024-01-15 12:30:45
+    const m = timeStr.match(/(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2}):(\d{2})/);
+    if (m) return new Date(m[1], m[2]-1, m[3], m[4], m[5], m[6]).getTime();
+    // 尝试 2024/01/15 12:30
+    const m2 = timeStr.match(/(\d{4})\/(\d{1,2})\/(\d{1,2})\s+(\d{1,2}):(\d{1,2})/);
+    if (m2) return new Date(m2[1], m2[2]-1, m2[3], m2[4], m2[5]).getTime();
+    return Date.now();
+  },
+
+  _mapWechatCategory(typeStr, goods, merchant) {
+    const text = `${typeStr} ${goods} ${merchant}`;
+    if (/餐饮|外卖|美食|餐厅|星巴克|麦当劳|肯德基|奶茶|咖啡|食品|超市|便利店/.test(text)) return '餐饮';
+    if (/打车|滴滴|地铁|公交|高铁|火车|机票|加油|停车|出行|骑行|单车/.test(text)) return '交通';
+    if (/淘宝|京东|拼多多|天猫|商城|购物|百货|服饰|数码|电器|化妆品/.test(text)) return '购物';
+    if (/电影|游戏|门票|旅游|KTV|娱乐|视频|音乐|会员/.test(text)) return '娱乐';
+    if (/房租|水电|物业|燃气|宽带|房贷/.test(text)) return '住房';
+    if (/医院|药|诊所|健康|体检|医疗/.test(text)) return '医疗';
+    if (/学费|培训|课程|书|教育|知识/.test(text)) return '教育';
+    if (/话费|流量|充值|通讯|联通|移动|电信/.test(text)) return '通讯';
+    if (/美容|理发|美甲|SPA|护肤/.test(text)) return '美容';
+    if (/工资|薪资|转账|退款|红包|退款|理财|收益|利息/.test(text)) return '其他';
+    return '其他';
+  },
+
+  _mapWechatPayment(paymentStr) {
+    if (!paymentStr) return '微信支付';
+    if (/零钱/.test(paymentStr)) return '微信支付';
+    if (/储蓄卡|借记卡|银行卡/.test(paymentStr)) return '银行卡';
+    if (/信用卡/.test(paymentStr)) return '信用卡';
+    if (/余额|支付宝/.test(paymentStr)) return '支付宝';
+    return '微信支付';
+  },
+
+  _showImportPreview(transactions) {
+    this._importData = transactions;
+    const incomeCount = transactions.filter(t => t.type === 'income').length;
+    const expenseCount = transactions.filter(t => t.type === 'expense').length;
+    const totalExpense = transactions.filter(t => t.type === 'expense').reduce((s, t) => s + parseFloat(t.amount), 0);
+    const totalIncome = transactions.filter(t => t.type === 'income').reduce((s, t) => s + parseFloat(t.amount), 0);
+
+    const rowsHtml = transactions.map((t, i) => {
+      const isIncome = t.type === 'income';
+      const expenseCats = ['餐饮','交通','购物','娱乐','住房','医疗','教育','通讯','美容','其他'];
+      const incomeCats = ['工资','奖金','兼职','理财','红包','其他'];
+      const cats = isIncome ? incomeCats : expenseCats;
+      const emoji = isIncome ? '💰' : (this.getExpenseEmoji(t.category) || '💸');
+      return `<tr class="import-row" data-idx="${i}">
+        <td style="font-size:12px;color:var(--text-muted);white-space:nowrap">${Storage.formatDate(t.date)}</td>
+        <td>${emoji}</td>
+        <td><input class="import-edit-amount" type="number" step="0.01" value="${t.amount}" style="width:70px;font-size:13px"></td>
+        <td>
+          <select class="import-edit-category" style="font-size:12px;padding:2px 4px">
+            ${cats.map(c => `<option value="${c}" ${c===t.category?'selected':''}>${c}</option>`).join('')}
+          </select>
+        </td>
+        <td style="font-size:12px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${this.esc(t.location)}">${this.esc(t.location)}</td>
+        <td>
+          <span class="import-type-badge ${isIncome ? 'income' : 'expense'}">${isIncome ? '收入' : '支出'}</span>
+        </td>
+      </tr>`;
+    }).join('');
+
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.id = 'importPreviewModal';
+    modal.innerHTML = `
+      <div class="modal-content" style="max-width:680px;max-height:85vh;display:flex;flex-direction:column">
+        <div class="modal-header">
+          <h2>📥 微信账单导入预览</h2>
+          <button class="modal-close" onclick="App.closeModal()">&times;</button>
+        </div>
+        <div style="padding:0 20px">
+          <div style="display:flex;gap:16px;margin-bottom:12px;flex-wrap:wrap">
+            <div class="import-stat"><span class="import-stat-num income">+¥${totalIncome.toFixed(2)}</span><span class="import-stat-label">收入 ${incomeCount}笔</span></div>
+            <div class="import-stat"><span class="import-stat-num expense">-¥${totalExpense.toFixed(2)}</span><span class="import-stat-label">支出 ${expenseCount}笔</span></div>
+            <div class="import-stat"><span class="import-stat-num">${transactions.length}</span><span class="import-stat-label">总计</span></div>
+          </div>
+          <p style="font-size:12px;color:var(--text-muted);margin-bottom:8px">可编辑每条的金额和分类，确认后点击导入</p>
+        </div>
+        <div style="overflow-y:auto;flex:1;padding:0 20px 10px">
+          <table class="import-table">
+            <thead>
+              <tr><th>时间</th><th></th><th>金额</th><th>分类</th><th>说明</th><th>类型</th></tr>
+            </thead>
+            <tbody>${rowsHtml}</tbody>
+          </table>
+        </div>
+        <div class="modal-footer" style="padding:16px 20px;display:flex;gap:8px;justify-content:flex-end">
+          <button class="btn btn-secondary" onclick="App.closeModal()">取消</button>
+          <button class="btn btn-primary" onclick="Pages.confirmImport()">确认导入 (${transactions.length}条)</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+  },
+
+  confirmImport() {
+    if (!this._importData) return;
+    // 读取编辑后的值
+    const rows = document.querySelectorAll('#importPreviewModal .import-row');
+    rows.forEach(row => {
+      const idx = parseInt(row.dataset.idx);
+      const amountInput = row.querySelector('.import-edit-amount');
+      const categorySelect = row.querySelector('.import-edit-category');
+      if (amountInput) this._importData[idx].amount = parseFloat(amountInput.value).toFixed(2);
+      if (categorySelect) this._importData[idx].category = categorySelect.value;
+    });
+
+    const result = Storage.addTransactions(this._importData);
+    App.closeModal();
+    this._importData = null;
+    App.toast(`导入成功 ${result.imported} 条${result.skipped > 0 ? `，跳过重复 ${result.skipped} 条` : ''}`);
+    this.render('accounting');
+  },
+
   saveTransaction() {
     const amount = document.getElementById('accAmount').value;
     const time = document.getElementById('accTime').value;
@@ -2747,6 +3005,122 @@ const Pages = {
       App.toast('已删除');
       this.render('accounting');
     }
+  },
+
+  editTransaction(id) {
+    const txs = Storage.getTransactions();
+    const tx = txs.find(t => t.id === id);
+    if (!tx) return;
+    const isIncome = tx.type === 'income';
+    const expenseCats = ['餐饮','交通','购物','娱乐','住房','医疗','教育','通讯','美容','其他'];
+    const incomeCats = ['工资','奖金','兼职','理财','红包','其他'];
+    const cats = isIncome ? incomeCats : expenseCats;
+    const dateObj = new Date(tx.date);
+    const dateStr = `${dateObj.getFullYear()}-${String(dateObj.getMonth()+1).padStart(2,'0')}-${String(dateObj.getDate()).padStart(2,'0')}`;
+    const timeStr = `${String(dateObj.getHours()).padStart(2,'0')}:${String(dateObj.getMinutes()).padStart(2,'0')}`;
+
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.id = 'editTxModal';
+    modal.innerHTML = `
+      <div class="modal-content" style="max-width:460px">
+        <div class="modal-header">
+          <h2>✏️ 编辑账单</h2>
+          <button class="modal-close" onclick="App.closeModal()">&times;</button>
+        </div>
+        <div style="padding:0 20px 16px">
+          <div style="display:flex;gap:8px;margin-bottom:12px">
+            <button class="chip ${isIncome?'active':''}" data-type="income" onclick="Pages._editTxType('income')" id="editTypeIncome">💰 收入</button>
+            <button class="chip ${!isIncome?'active':''}" data-type="expense" onclick="Pages._editTxType('expense')" id="editTypeExpense">💸 支出</button>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+            <div>
+              <label style="font-size:13px;color:var(--text-muted);margin-bottom:4px;display:block">💰 金额</label>
+              <input class="input" id="editAmount" type="number" step="0.01" value="${tx.amount}" style="width:100%">
+            </div>
+            <div>
+              <label style="font-size:13px;color:var(--text-muted);margin-bottom:4px;display:block">🏷️ 分类</label>
+              <select class="select" id="editCategory" style="width:100%">
+                ${cats.map(c => `<option value="${c}" ${c===tx.category?'selected':''}>${c}</option>`).join('')}
+              </select>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+            <div>
+              <label style="font-size:13px;color:var(--text-muted);margin-bottom:4px;display:block">🕐 日期</label>
+              <input class="input" id="editDate" type="date" value="${dateStr}" style="width:100%">
+            </div>
+            <div>
+              <label style="font-size:13px;color:var(--text-muted);margin-bottom:4px;display:block">⏰ 时间</label>
+              <input class="input" id="editTime" type="time" value="${timeStr}" style="width:100%">
+            </div>
+          </div>
+          <div style="margin-bottom:10px">
+            <label style="font-size:13px;color:var(--text-muted);margin-bottom:4px;display:block">📍 地点/说明</label>
+            <input class="input" id="editLocation" value="${this.esc(tx.location || '')}" style="width:100%">
+          </div>
+          <div style="display:grid;grid-template-columns:1fr;gap:10px;margin-bottom:10px">
+            <div>
+              <label style="font-size:13px;color:var(--text-muted);margin-bottom:4px;display:block">💳 支付方式</label>
+              <select class="select" id="editPayment" style="width:100%">
+                ${['微信支付','支付宝','现金','银行卡','信用卡','其他'].map(p => `<option value="${p}" ${p===tx.payment?'selected':''}>${p}</option>`).join('')}
+              </select>
+            </div>
+          </div>
+          <div style="margin-bottom:10px">
+            <label style="font-size:13px;color:var(--text-muted);margin-bottom:4px;display:block">📝 备注</label>
+            <input class="input" id="editNotes" value="${this.esc(tx.notes || '')}" style="width:100%">
+          </div>
+        </div>
+        <div class="modal-footer" style="padding:16px 20px;display:flex;gap:8px;justify-content:flex-end">
+          <button class="btn btn-secondary" onclick="App.closeModal()">取消</button>
+          <button class="btn btn-primary" onclick="Pages.saveEditTransaction('${id}')">保存修改</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+    this._editTxId = id;
+    this._editTxCurrentType = isIncome ? 'income' : 'expense';
+  },
+
+  _editTxType(type) {
+    document.getElementById('editTypeIncome').classList.toggle('active', type === 'income');
+    document.getElementById('editTypeExpense').classList.toggle('active', type === 'expense');
+    this._editTxCurrentType = type;
+    const cats = type === 'income'
+      ? ['工资','奖金','兼职','理财','红包','其他']
+      : ['餐饮','交通','购物','娱乐','住房','医疗','教育','通讯','美容','其他'];
+    const select = document.getElementById('editCategory');
+    const currentVal = select.value;
+    select.innerHTML = cats.map(c => `<option value="${c}">${c}</option>`).join('');
+    if (cats.includes(currentVal)) select.value = currentVal;
+  },
+
+  saveEditTransaction(id) {
+    const amount = document.getElementById('editAmount').value;
+    const category = document.getElementById('editCategory').value;
+    const dateStr = document.getElementById('editDate').value;
+    const timeStr = document.getElementById('editTime').value;
+    const location = document.getElementById('editLocation').value.trim();
+    const payment = document.getElementById('editPayment').value;
+    const notes = document.getElementById('editNotes').value.trim();
+    const type = this._editTxCurrentType || 'expense';
+
+    if (!amount || parseFloat(amount) <= 0) { App.toast('请输入有效金额'); return; }
+    const date = new Date(dateStr + 'T' + (timeStr || '00:00')).getTime();
+
+    Storage.updateTransaction(id, {
+      amount: parseFloat(amount).toFixed(2),
+      category,
+      date,
+      location,
+      payment,
+      notes,
+      type
+    });
+    App.closeModal();
+    App.toast('修改成功');
+    this.render('accounting');
   },
 
   // ===== Utility =====

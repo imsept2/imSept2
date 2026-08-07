@@ -1751,6 +1751,74 @@ body {
 .transaction-amount.income { color: #5A8F6E; }
 .transaction-amount.expense { color: #C08080; }
 
+.transaction-actions {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+/* --- 微信账单导入预览 --- */
+.import-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 16px;
+  background: var(--bg-light);
+  border-radius: var(--radius-md);
+}
+.import-stat-num { font-size: 18px; font-weight: 700; color: var(--text); }
+.import-stat-num.income { color: #5A8F6E; }
+.import-stat-num.expense { color: #C08080; }
+.import-stat-label { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+.import-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.import-table th {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-align: left;
+  padding: 6px 4px;
+  border-bottom: 1.5px solid var(--border-light);
+  white-space: nowrap;
+}
+.import-table td {
+  padding: 6px 4px;
+  border-bottom: 1px solid var(--border-light);
+  vertical-align: middle;
+}
+.import-row:hover { background: var(--bg-light); }
+.import-edit-amount {
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 3px 6px;
+  background: var(--card);
+  color: var(--text);
+}
+.import-edit-category {
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 3px 6px;
+  background: var(--card);
+  color: var(--text);
+}
+.import-type-badge {
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.import-type-badge.income { background: #e8f5e9; color: #5A8F6E; }
+.import-type-badge.expense { background: #fbe9e9; color: #C08080; }
+
+@media (max-width: 600px) {
+  .import-table th:nth-child(5),
+  .import-table td:nth-child(5) { display: none; }
+}
+
 /* --- Empty State --- */
 .empty-state {
   text-align: center;
@@ -1833,6 +1901,22 @@ body {
 .modal-overlay.show {
   display: flex;
   opacity: 1;
+}
+
+/* 动态创建的弹窗（不需要show类） */
+.modal-overlay:not(#modalOverlay) {
+  display: flex;
+  opacity: 1;
+}
+
+.modal-content {
+  background: var(--card);
+  border-radius: var(--radius-lg);
+  width: 100%;
+  max-width: 480px;
+  max-height: 85vh;
+  overflow-y: auto;
+  box-shadow: 0 8px 32px var(--shadow-lg);
 }
 
 .modal {
