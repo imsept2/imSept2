@@ -883,9 +883,7 @@ const Pages = {
   _handleAvatarPhoto(input) {
     const file = input.files[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const dataUrl = e.target.result;
+    this._compressImage(file, 300, 0.85, (dataUrl) => {
       document.getElementById('nmAvatarId').value = 'photo:' + dataUrl;
       document.querySelectorAll('.note-emoji-item').forEach(i => i.classList.remove('selected'));
       document.getElementById('nmCustomEmoji').value = '';
@@ -900,8 +898,7 @@ const Pages = {
         const text = label.childNodes[label.childNodes.length - 1];
         if (text && text.nodeType === 3) text.textContent = '更换照片';
       }
-    };
-    reader.readAsDataURL(file);
+    });
     input.value = '';
   },
 
@@ -911,17 +908,51 @@ const Pages = {
     const preview = document.getElementById('nmImgPreview');
     let loaded = 0;
     files.forEach(file => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
+      this._compressImage(file, 1280, 0.85, (dataUrl) => {
         const div = document.createElement('div');
         div.className = 'note-img-preview-item';
-        div.innerHTML = `<img src="${e.target.result}"><button class="note-img-remove" onclick="this.parentElement.remove();Pages._syncNoteImages()">×</button>`;
+        div.innerHTML = `<img src="${dataUrl}"><button class="note-img-remove" onclick="this.parentElement.remove();Pages._syncNoteImages()">×</button>`;
         preview.appendChild(div);
         loaded++;
-      };
-      reader.readAsDataURL(file);
+      });
     });
     input.value = '';
+  },
+
+  // 图片压缩：用canvas缩放+JPEG压缩，防止localStorage超限
+  _compressImage(file, maxDim, quality, callback) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        let { width, height } = img;
+        // 如果图片本身很小（< maxDim），不放大，直接按原尺寸压缩
+        if (width > maxDim || height > maxDim) {
+          if (width > height) {
+            height = Math.round(height * maxDim / width);
+            width = maxDim;
+          } else {
+            width = Math.round(width * maxDim / height);
+            height = maxDim;
+          }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        // JPEG压缩（PNG透明通道图片除外）
+        const isPng = file.type === 'image/png';
+        const dataUrl = canvas.toDataURL(isPng ? 'image/png' : 'image/jpeg', quality);
+        callback(dataUrl);
+      };
+      img.onerror = () => {
+        // 压缩失败则用原图
+        callback(e.target.result);
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
   },
 
   _syncNoteImages() {},
@@ -957,11 +988,13 @@ const Pages = {
       const note = Storage.data.notes.find(n => n.id === this.noteState.editingId);
       if (note) {
         Object.assign(note, data);
-        Storage.save();
+        const ok = Storage.save();
+        if (!ok) { App.toast('保存失败，存储空间可能已满'); return; }
         App.toast('已保存');
       }
     } else {
-      Storage.addNote(data);
+      const note = Storage.addNote(data);
+      if (!note) { App.toast('发布失败，图片可能过大，请减少图片数量或尺寸'); return; }
       App.toast('发布成功');
     }
 

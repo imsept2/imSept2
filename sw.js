@@ -1,6 +1,6 @@
 /* ===== imSept2 Service Worker ===== */
 
-const CACHE_NAME = 'imSept2-v202608071600';
+const CACHE_NAME = 'imSept2-v202608181440';
 const ASSETS = [
   './',
   './index.html',

@@ -27,8 +27,13 @@ const Storage = {
   save() {
     try {
       localStorage.setItem(this.KEY, JSON.stringify(this.data));
+      return true;
     } catch (e) {
       console.error('保存失败:', e);
+      if (e.name === 'QuotaExceededError') {
+        alert('存储空间已满！图片可能过大，请尝试减少图片数量或尺寸。');
+      }
+      return false;
     }
   },
 
@@ -108,8 +113,7 @@ const Storage = {
       reposts: data.reposts || 0
     };
     this.data.notes.unshift(note);
-    this.save();
-    return note;
+    return this.save() ? note : null;
   },
 
   updateNote(id, data) {
